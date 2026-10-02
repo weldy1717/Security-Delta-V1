@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1b2a">
+<meta name="description" content="Aplikasi patroli security offline">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<title>Security Patrol</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#17202a}
+header{background:#0d1b2a;color:white;padding:18px 16px;position:sticky;top:0;z-index:5}
+h1{font-size:22px;margin:0 0 5px}.status{font-size:12px;color:#b9f6ca}
+main{padding:14px;max-width:650px;margin:auto}.card{background:white;border-radius:14px;padding:15px;margin-bottom:12px;box-shadow:0 2px 8px #00000012}
+label{display:block;font-weight:bold;font-size:13px;margin:8px 0 5px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #ccd3da;border-radius:9px;font-size:15px}
+button{width:100%;border:0;border-radius:10px;padding:13px;margin:5px 0;font-size:15px;font-weight:bold;background:#1565c0;color:white}
+button.green{background:#2e7d32}button.red{background:#c62828}button.dark{background:#263238}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.time{font-weight:bold;margin:10px 0}
+.log{border-left:4px solid #1565c0;padding:9px 10px;margin:7px 0;background:#f7f9fb;border-radius:6px;font-size:13px}
+.small{font-size:12px;color:#667}.hidden{display:none}
+#video{width:100%;border-radius:10px;background:#000;display:none;margin-top:8px}
+</style>
+</head>
+<body>
+<header><h1>SECURITY PATROL</h1><div class="status">● OFFLINE • DATA TERSIMPAN DI HP</div></header>
+<main>
+<div class="card">
+<label>Nama Petugas</label><input id="petugas" placeholder="Nama petugas">
+<label>Shift</label><select id="shift"><option>Pagi</option><option>Siang</option><option>Malam</option></select>
+<div class="time" id="clock"></div>
+</div>
+
+<div class="card">
+<button onclick="startScan()">📷 SCAN QR TITIK PATROLI</button>
+<video id="video" autoplay playsinline></video>
+<div id="scanHint" class="small"></div>
+<label>Atau masukkan kode titik</label>
+<input id="titik" placeholder="Contoh: LOBBY-01">
+<button class="green" onclick="savePatrol()">✓ SIMPAN PATROLI</button>
+</div>
+
+<div class="card">
+<h3>Kendaraan</h3>
+<div class="grid">
+<button onclick="vehicle('MASUK')">🚗 MASUK</button>
+<button class="red" onclick="vehicle('PULANG')">🏠 PULANG</button>
+</div>
+</div>
+
+<div class="card">
+<div class="grid">
+<button class="dark" onclick="showHistory()">📋 RIWAYAT</button>
+<button onclick="showReport()">📝 LAPORAN</button>
+</div>
+<button class="green" onclick="shareWA()">📲 BAGIKAN KE WHATSAPP</button>
+</div>
+
+<div class="card"><div id="output">Belum ada kegiatan.</div></div>
+</main>
+
+<script>
+const KEY="security_patrol_logs_v1";
+let logs=JSON.parse(localStorage.getItem(KEY)||"[]");
+let stream=null;
+
+function now(){return new Date().toLocaleString("id-ID",{hour12:false})}
+function clock(){document.getElementById("clock").textContent="Waktu: "+now()}
+setInterval(clock,1000);clock();
+
+function who(){let p=document.getElementById("petugas").value.trim()||"Petugas";return p+" • Shift "+document.getElementById("shift").value}
+function save(){localStorage.setItem(KEY,JSON.stringify(logs))}
+function add(text){logs.push({time:now(),who:who(),text});save();showLast()}
+
+function showLast(){let x=logs[logs.length-1];document.getElementById("output").innerHTML="<b>✓ Tersimpan offline</b><div class='log'>"+esc(x.time)+"<br><b>"+esc(x.who)+"</b><br>"+esc(x.text)+"</div>"}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+
+function savePatrol(){
+ let t=document.getElementById("titik").value.trim()||"TITIK-PATROLI";
+ add("PATROLI → "+t); document.getElementById("titik").value="";
+}
+
+function vehicle(type){
+ let n=prompt("Nomor polisi:");
+ if(n===null)return;
+ let d=prompt("Nama pengemudi:");
+ if(d===null)return;
+ let k=prompt("Keperluan / tujuan:")||"-";
+ add("KENDARAAN "+type+" → "+n+" | "+d+" | "+k);
+}
+
+function showHistory(){
+ if(!logs.length){document.getElementById("output").textContent="Belum ada data.";return}
+ document.getElementById("output").innerHTML="<h3>RIWAYAT</h3>"+logs.map(x=>"<div class='log'>"+esc(x.time)+"<br><b>"+esc(x.who)+"</b><br>"+esc(x.text)+"</div>").join("");
+}
+
+function report(){
+ let date=new Date().toLocaleDateString("id-ID");
+ let p=document.getElementById("petugas").value.trim()||"Petugas";
+ let s=document.getElementById("shift").value;
+ let lines=logs.length?logs.map(x=>"- "+x.time+" | "+x.who+" | "+x.text).join("\n"):"- Belum ada kegiatan";
+ return "LAPORAN KEGIATAN SECURITY\nTanggal: "+date+"\nPetugas: "+p+"\nShift: "+s+"\n\nKEGIATAN:\n"+lines+"\n\nKeterangan: Kegiatan tercatat melalui Security Patrol (offline).";
+}
+function showReport(){document.getElementById("output").innerHTML="<pre style='white-space:pre-wrap;font-family:Arial'>"+esc(report())+"</pre>"}
+function shareWA(){
+ let text=encodeURIComponent(report());
+ location.href="https://wa.me/?text="+text;
+}
+
+async function startScan(){
+ const v=document.getElementById("video"), h=document.getElementById("scanHint");
+ if(!("BarcodeDetector" in window)){h.textContent="Scanner QR otomatis tidak tersedia di browser ini. Gunakan kolom kode titik di bawah.";return}
+ try{
+   const detector=new BarcodeDetector({formats:["qr_code"]});
+   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+   v.srcObject=stream;v.style.display="block";h.textContent="Arahkan kamera ke QR...";
+   const scan=async()=>{if(!stream)return;try{
+     const codes=await detector.detect(v);
+     if(codes.length){document.getElementById("titik").value=codes[0].rawValue||"QR";stopScan();savePatrol();return}
+   }catch(e){} requestAnimationFrame(scan)};
+   scan();
+ }catch(e){h.textContent="Kamera tidak dapat digunakan. Izinkan akses kamera atau masukkan kode titik manual."}
+}
+function stopScan(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}document.getElementById("video").style.display="none"}
+
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
+</script>
+</body></html>
